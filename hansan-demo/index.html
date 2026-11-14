@@ -118,9 +118,28 @@ body {
 			<div id="loadmsg">한산 난중일기 프리데모 · 처음엔 약 70MB를 받습니다. 잠시만 기다려 주세요.</div>
 		</div>
 
+		<script>
+// 소리 풀기: 엔진이 만든 AudioContext 를 모아 두었다가 손가락·클릭·키가 들어올 때마다 다시 켠다
+(function(){
+	const ctxs = [];
+	['AudioContext', 'webkitAudioContext'].forEach(function(n){
+		const C = window[n];
+		if (!C) return;
+		const W = function(){ const c = new (Function.prototype.bind.apply(C, [null].concat([].slice.call(arguments))))(); ctxs.push(c); return c; };
+		W.prototype = C.prototype;
+		window[n] = W;
+	});
+	function unlock(){
+		ctxs.forEach(function(c){ if (c.state !== 'running') { c.resume().catch(function(){}); } });
+	}
+	['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(function(t){
+		window.addEventListener(t, unlock, true);
+	});
+})();
+</script>
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":36455872,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":36458544,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
