@@ -78,7 +78,8 @@ body {
 		
 #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #120c08; color: #f0dcb0;
   font-family: sans-serif; text-align: center; align-items: center; justify-content: center; flex-direction: column; font-size: 18px; line-height: 1.6; }
-@media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
+@media (orientation: portrait) and (max-width: 900px) { #rotate:not(.closed) { display: flex; } }
+#rotate button { margin: 8px; padding: 12px 20px; font-size: 16px; border-radius: 8px; border: 1px solid #c8a060; background: #2e2014; color: #ffd34d; }
 #loadmsg { position: absolute; bottom: 4%; left: 0; right: 0; text-align: center; color: #d8c8a8; font-family: sans-serif; font-size: 14px; }
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
@@ -90,7 +91,22 @@ body {
 			Your browser does not support the canvas tag.
 		</canvas>
 
-		<div id="rotate"><div style="font-size:42px">⟳</div><div>휴대폰을 가로로 돌려 주세요</div><div style="font-size:13px;opacity:.7">한산 난중일기 프리데모</div></div>
+		<div id="rotate"><div style="font-size:42px">⟳</div><div>가로 화면에서 하기 좋습니다</div>
+<div style="font-size:13px;opacity:.75;margin-bottom:8px">휴대폰 '자동 회전'이 꺼져 있으면 켜 주세요</div>
+<button id="btn-land">가로 전체 화면으로 하기</button><button id="btn-skip">이대로 하기</button></div>
+<script>
+(function(){
+	const box = document.getElementById('rotate');
+	function close(){ box.classList.add('closed'); }
+	document.getElementById('btn-skip').onclick = close;
+	document.getElementById('btn-land').onclick = async function(){
+		try { await document.documentElement.requestFullscreen(); } catch (e) {}
+		try { await screen.orientation.lock('landscape'); } catch (e) {}
+		close();
+	};
+	window.addEventListener('orientationchange', function(){ if (screen.orientation && screen.orientation.type.startsWith('landscape')) close(); });
+})();
+</script>
 		<noscript>
 			Your browser does not support JavaScript.
 		</noscript>
