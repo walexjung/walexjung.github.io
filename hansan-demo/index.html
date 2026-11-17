@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>Hansan: The War Diary — Demo</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #242424;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		
+#rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #120c08; color: #f0dcb0;
+  font-family: sans-serif; text-align: center; align-items: center; justify-content: center; flex-direction: column; font-size: 18px; line-height: 1.6; }
+@media (orientation: portrait) and (max-width: 900px) { #rotate:not(.closed) { display: flex; } }
+#rotate button { margin: 8px; padding: 12px 20px; font-size: 16px; border-radius: 8px; border: 1px solid #c8a060; background: #2e2014; color: #ffd34d; }
+#loadmsg { position: absolute; bottom: 4%; left: 0; right: 0; text-align: center; color: #d8c8a8; font-family: sans-serif; font-size: 14px; }
+		</style>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<div id="rotate"><div style="font-size:42px">⟳</div><div>가로 화면에서 하기 좋습니다</div>
+<div style="font-size:13px;opacity:.75;margin-bottom:8px">휴대폰 '자동 회전'이 꺼져 있으면 켜 주세요</div>
+<button id="btn-land">가로 전체 화면으로 하기</button><button id="btn-skip">이대로 하기</button></div>
+<script>
+(function(){
+	const box = document.getElementById('rotate');
+	function close(){ box.classList.add('closed'); }
+	document.getElementById('btn-skip').onclick = close;
+	document.getElementById('btn-land').onclick = async function(){
+		try { await document.documentElement.requestFullscreen(); } catch (e) {}
+		try { await screen.orientation.lock('landscape'); } catch (e) {}
+		close();
+	};
+	window.addEventListener('orientationchange', function(){ if (screen.orientation && screen.orientation.type.startsWith('landscape')) close(); });
+})();
+</script>
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+			<div id="loadmsg">한산 난중일기 프리데모 · 게임 데이터를 불러오는 중입니다. 잠시만 기다려 주세요.</div>
+		</div>
+
+		<script>
+// 소리 풀기: 엔진이 만든 AudioContext 를 모아 두었다가 손가락·클릭·키가 들어올 때마다 다시 켠다
+(function(){
+	const ctxs = [];
+	['AudioContext', 'webkitAudioContext'].forEach(function(n){
+		const C = window[n];
+		if (!C) return;
+		const W = function(){ const c = new (Function.prototype.bind.apply(C, [null].concat([].slice.call(arguments))))(); ctxs.push(c); return c; };
+		W.prototype = C.prototype;
+		window[n] = W;
+	});
+	function unlock(){
+		ctxs.forEach(function(c){ if (c.state !== 'running') { c.resume().catch(function(){}); } });
+	}
+	['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(function(t){
+		window.addEventListener(t, unlock, true);
+	});
+})();
+</script>
+		<script src="index.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":48561792,"index.wasm":37700666},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	<script>
+(function(){
+ const en = !navigator.language.toLowerCase().startsWith('ko');
+ if (!en) return;
+ document.documentElement.lang='en';
+ document.title='Hansan: The War Diary — Demo';
+ const translations={
+ '가로 화면에서 하기 좋습니다':'Best played in landscape mode',
+ "휴대폰 '자동 회전'이 꺼져 있으면 켜 주세요":'Please enable auto-rotate on your phone.',
+ '가로 전체 화면으로 하기':'Play fullscreen in landscape',
+ '이대로 하기':'Continue as is',
+ '한산 난중일기 프리데모 · 게임 데이터를 불러오는 중입니다. 잠시만 기다려 주세요.':'Hansan: The War Diary — Demo · Loading game data. Please wait.'
+ };
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+ let n; while(n=walker.nextNode()){if(translations[n.textContent]) n.textContent=translations[n.textContent];}
+})();
+</script></body>
+</html>
+
