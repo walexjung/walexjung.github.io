@@ -23,21 +23,26 @@ jobs:
     steps:
       - name: Checkout existing website
         uses: actions/checkout@v4
-      - name: Download and verify V113 demo ZIP
+      - name: Download three chunks, reconstruct and verify V113 ZIP
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/hansan-source /tmp/hansan-extract
           gh release download hansan-v113-web --repo "${{ github.repository }}" \
-            --pattern "hansan-web-demo-V113-VERIFIED.zip" \
-            --dir /tmp/hansan-source --clobber
-          echo "e7d59fe6d2d783f550f022ec0e49e732328c2f781a194e23983d0d84697c5dcf  /tmp/hansan-source/hansan-web-demo-V113-VERIFIED.zip" | sha256sum -c - || {
-            echo "::error::Release ZIP differs from the verified V113 original. Replace the release asset with the verified ZIP before retrying."
-            exit 1
-          }
-          unzip -tq /tmp/hansan-source/hansan-web-demo-V113-VERIFIED.zip
-          unzip -q /tmp/hansan-source/hansan-web-demo-V113-VERIFIED.zip -d /tmp/hansan-extract
+            --pattern "hansan-v113-part-*.bin" --dir /tmp/hansan-source --clobber
+          cd /tmp/hansan-source
+          for n in 00 01 02; do
+            test -s "hansan-v113-part-${n}.bin" || { echo "::error::Missing part ${n}"; exit 1; }
+          done
+          printf '%s\n' \
+            '985d1d5f4b3c9da4c82877d582fb23b2c48ff3c60aa6ec9f9607c94ab5b50df0  hansan-v113-part-00.bin' \
+            '1da0682a6597e02c11f0f26c5de7e528085e9a30bda25dad053d84b10086fb12  hansan-v113-part-01.bin' \
+            'a7eae0a3853b4bf7fb566cad9b932c10aee37d47d23821ea1493b10418a81bcc  hansan-v113-part-02.bin' | sha256sum -c -
+          cat hansan-v113-part-00.bin hansan-v113-part-01.bin hansan-v113-part-02.bin > hansan-web-demo-V113.zip
+          echo 'e7d59fe6d2d783f550f022ec0e49e732328c2f781a194e23983d0d84697c5dcf  hansan-web-demo-V113.zip' | sha256sum -c -
+          unzip -tq hansan-web-demo-V113.zip
+          unzip -q hansan-web-demo-V113.zip -d /tmp/hansan-extract
           for name in index.html index.pck index.wasm index.js; do
             test -s "/tmp/hansan-extract/$name" || { echo "::error::Missing or empty file: $name"; exit 1; }
           done
