@@ -1,0 +1,50 @@
+name: Deploy Hansan V113 Web Demo
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'hansan-v113-web'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout existing website
+        uses: actions/checkout@v4
+      - name: Download demo ZIP from this repository release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/hansan-source
+          gh release download hansan-v113-web --repo "${{ github.repository }}" --pattern "hansan-web-demo-V113.zip" --dir /tmp/hansan-source
+          mkdir -p /tmp/hansan-extract
+          unzip -q /tmp/hansan-source/hansan-web-demo-V113.zip -d /tmp/hansan-extract
+          test -s /tmp/hansan-extract/index.html
+          test -s /tmp/hansan-extract/index.pck
+          test -s /tmp/hansan-extract/index.wasm
+      - name: Prepare Pages site without changing tracked site files
+        run: |
+          mkdir -p /tmp/pages-site
+          tar --exclude=.git --exclude=.github -cf - . | (cd /tmp/pages-site && tar -xf -)
+          rm -rf /tmp/pages-site/hansan-demo
+          mkdir -p /tmp/pages-site/hansan-demo
+          cp -a /tmp/hansan-extract/. /tmp/pages-site/hansan-demo/
+          touch /tmp/pages-site/.nojekyll
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/pages-site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
