@@ -1,8 +1,11 @@
 name: Deploy Hansan V113 Web Demo
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+    inputs:
+      confirm_demo_only:
+        description: "I verified this ZIP contains ONLY the intended demo content (type DEMO_ONLY)"
+        required: true
+        type: string
 permissions:
   contents: read
   pages: write
@@ -12,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'hansan-v113-web'
+    if: inputs.confirm_demo_only == 'DEMO_ONLY'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -20,18 +23,18 @@ jobs:
     steps:
       - name: Checkout existing website
         uses: actions/checkout@v4
-      - name: Download demo ZIP from this repository release
+      - name: Download verified demo ZIP from this repository release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p /tmp/hansan-source
+          mkdir -p /tmp/hansan-source /tmp/hansan-extract
           gh release download hansan-v113-web --repo "${{ github.repository }}" --pattern "hansan-web-demo-V113.zip" --dir /tmp/hansan-source
-          mkdir -p /tmp/hansan-extract
           unzip -q /tmp/hansan-source/hansan-web-demo-V113.zip -d /tmp/hansan-extract
           test -s /tmp/hansan-extract/index.html
           test -s /tmp/hansan-extract/index.pck
           test -s /tmp/hansan-extract/index.wasm
-      - name: Prepare Pages site without changing tracked site files
+          test -s /tmp/hansan-extract/index.js
+      - name: Prepare Pages site preserving existing homepage
         run: |
           mkdir -p /tmp/pages-site
           tar --exclude=.git --exclude=.github -cf - . | (cd /tmp/pages-site && tar -xf -)
