@@ -28,7 +28,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/hansan-source /tmp/hansan-extract
-          gh release download '한산-v113-웹' --repo "${{ github.repository }}" --pattern "hansan-web-demo-V113.zip" --dir /tmp/hansan-source
+          gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" --jq '.[] | .assets[]? | select(.name == "hansan-web-demo-V113.zip") | .id' > /tmp/hansan-source/asset_ids.txt
+          ASSET_ID="$(head -n 1 /tmp/hansan-source/asset_ids.txt)"
+          test -n "$ASSET_ID" || { echo "ERROR: V113 release asset not found"; exit 1; }
+          gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$ASSET_ID" > /tmp/hansan-source/hansan-web-demo-V113.zip
+          unzip -tq /tmp/hansan-source/hansan-web-demo-V113.zip
           unzip -q /tmp/hansan-source/hansan-web-demo-V113.zip -d /tmp/hansan-extract
           test -s /tmp/hansan-extract/index.html
           test -s /tmp/hansan-extract/index.pck
