@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_demo_only:
-        description: "I verified this ZIP contains ONLY the intended demo content (type DEMO_ONLY)"
+        description: "Confirm V113 ZIP is safe to publish (type DEMO_ONLY after reviewing game content)"
         required: true
         type: string
 permissions:
@@ -28,7 +28,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/hansan-source /tmp/hansan-extract
-          gh release download hansan-v113-web --repo "${{ github.repository }}" --pattern "hansan-web-demo-V113.zip" --dir /tmp/hansan-source
+          gh release download '한산-v113-웹' --repo "${{ github.repository }}" --pattern "hansan-web-demo-V113.zip" --dir /tmp/hansan-source
           unzip -q /tmp/hansan-source/hansan-web-demo-V113.zip -d /tmp/hansan-extract
           test -s /tmp/hansan-extract/index.html
           test -s /tmp/hansan-extract/index.pck
