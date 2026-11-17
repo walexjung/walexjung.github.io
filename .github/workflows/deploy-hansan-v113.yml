@@ -30,14 +30,14 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/hansan-source /tmp/hansan-extract
           gh release download hansan-v113-web --repo "${{ github.repository }}" \
-            --pattern "hansan-web-demo-V113.zip" \
+            --pattern "hansan-web-demo-V113-VERIFIED.zip" \
             --dir /tmp/hansan-source --clobber
-          echo "e7d59fe6d2d783f550f022ec0e49e732328c2f781a194e23983d0d84697c5dcf  /tmp/hansan-source/hansan-web-demo-V113.zip" | sha256sum -c - || {
+          echo "e7d59fe6d2d783f550f022ec0e49e732328c2f781a194e23983d0d84697c5dcf  /tmp/hansan-source/hansan-web-demo-V113-VERIFIED.zip" | sha256sum -c - || {
             echo "::error::Release ZIP differs from the verified V113 original. Replace the release asset with the verified ZIP before retrying."
             exit 1
           }
-          unzip -tq /tmp/hansan-source/hansan-web-demo-V113.zip
-          unzip -q /tmp/hansan-source/hansan-web-demo-V113.zip -d /tmp/hansan-extract
+          unzip -tq /tmp/hansan-source/hansan-web-demo-V113-VERIFIED.zip
+          unzip -q /tmp/hansan-source/hansan-web-demo-V113-VERIFIED.zip -d /tmp/hansan-extract
           for name in index.html index.pck index.wasm index.js; do
             test -s "/tmp/hansan-extract/$name" || { echo "::error::Missing or empty file: $name"; exit 1; }
           done
