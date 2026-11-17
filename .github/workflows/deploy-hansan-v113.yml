@@ -23,21 +23,24 @@ jobs:
     steps:
       - name: Checkout existing website
         uses: actions/checkout@v4
-      - name: Download verified demo ZIP from this repository release
+      - name: Download and verify V113 demo ZIP
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           mkdir -p /tmp/hansan-source /tmp/hansan-extract
-          gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" --jq '.[] | .assets[]? | select(.name == "hansan-web-demo-V113.zip") | .id' > /tmp/hansan-source/asset_ids.txt
-          ASSET_ID="$(head -n 1 /tmp/hansan-source/asset_ids.txt)"
-          test -n "$ASSET_ID" || { echo "ERROR: V113 release asset not found"; exit 1; }
-          gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$ASSET_ID" > /tmp/hansan-source/hansan-web-demo-V113.zip
+          gh release download hansan-v113-web --repo "${{ github.repository }}" \
+            --pattern "hansan-web-demo-V113.zip" \
+            --dir /tmp/hansan-source --clobber
+          echo "e7d59fe6d2d783f550f022ec0e49e732328c2f781a194e23983d0d84697c5dcf  /tmp/hansan-source/hansan-web-demo-V113.zip" | sha256sum -c - || {
+            echo "::error::Release ZIP differs from the verified V113 original. Replace the release asset with the verified ZIP before retrying."
+            exit 1
+          }
           unzip -tq /tmp/hansan-source/hansan-web-demo-V113.zip
           unzip -q /tmp/hansan-source/hansan-web-demo-V113.zip -d /tmp/hansan-extract
-          test -s /tmp/hansan-extract/index.html
-          test -s /tmp/hansan-extract/index.pck
-          test -s /tmp/hansan-extract/index.wasm
-          test -s /tmp/hansan-extract/index.js
+          for name in index.html index.pck index.wasm index.js; do
+            test -s "/tmp/hansan-extract/$name" || { echo "::error::Missing or empty file: $name"; exit 1; }
+          done
       - name: Prepare Pages site preserving existing homepage
         run: |
           mkdir -p /tmp/pages-site
