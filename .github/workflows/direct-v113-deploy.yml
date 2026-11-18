@@ -1,0 +1,44 @@
+name: Direct V113 Pages Recovery
+on:
+  push:
+    paths:
+      - .github/workflows/direct-v113-deploy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original verified build without phone upload
+        env:
+          ORIGINAL_URL: 'https://sdmntprjapaneast.oaiusercontent.com/files/00000000-e1d0-8209-ab53-b27bc9cb9dc0/raw?se=2026-11-18T00%3A08%3A34Z&sp=r&sv=2026-06-06&sr=b&scid=5ce25aaa-a6ed-522a-a743-37cec08660c1&skoid=bb372dd6-3b2a-4af2-b355-c26497ba23cd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-17T02%3A57%3A06Z&ske=2026-11-18T02%3A57%3A06Z&sks=b&skv=2026-06-06&sig=ghQXbZAKQWbBCezUJknvciaqDCuCnDDgZawE2eYGU28%3D'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v113 /tmp/pages-site
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 20 -o /tmp/v113/verified.zip "$ORIGINAL_URL"
+          echo 'e7d59fe6d2d783f550f022ec0e49e732328c2f781a194e23983d0d84697c5dcf  /tmp/v113/verified.zip' | sha256sum -c -
+          unzip -tq /tmp/v113/verified.zip
+          mkdir -p /tmp/v113/game
+          unzip -q /tmp/v113/verified.zip -d /tmp/v113/game
+          for f in index.html index.pck index.wasm index.js; do test -s "/tmp/v113/game/$f"; done
+          tar --exclude=.git --exclude=.github -cf - . | (cd /tmp/pages-site && tar -xf -)
+          rm -rf /tmp/pages-site/hansan-demo
+          mkdir -p /tmp/pages-site/hansan-demo
+          cp -a /tmp/v113/game/. /tmp/pages-site/hansan-demo/
+          touch /tmp/pages-site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/pages-site
+      - uses: actions/deploy-pages@v4
+        id: deployment
