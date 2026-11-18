@@ -30,7 +30,7 @@ jobs:
       - name: Confirm saved Pages archive
         run: |
           test -s "${{ runner.temp }}/saved-pages/artifact.tar"
-          tar -tzf "${{ runner.temp }}/saved-pages/artifact.tar" > "${{ runner.temp }}/pages-contents.txt"
+          tar -tf "${{ runner.temp }}/saved-pages/artifact.tar" > "${{ runner.temp }}/pages-contents.txt"
           grep -F 'hansan-demo/index.html' "${{ runner.temp }}/pages-contents.txt"
           grep -F 'hansan-demo/index.pck' "${{ runner.temp }}/pages-contents.txt"
       - name: Repackage Pages deployment artifact
