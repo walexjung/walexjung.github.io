@@ -36,7 +36,7 @@ jobs:
       - name: Repackage Pages deployment artifact
         uses: actions/upload-artifact@v4
         with:
-          name: github-pages
+          name: github-pages-v113-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/saved-pages/artifact.tar
           retention-days: 90
           compression-level: 0
@@ -44,3 +44,5 @@ jobs:
       - name: Deploy verified V113 to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-v113-attempt-${{ github.run_attempt }}
