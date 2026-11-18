@@ -1,0 +1,95 @@
+name: V120 live browser and audio-unlock smoke test
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/v120-live-audio-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium web tester
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --silent playwright@1.58.2
+          npx playwright install chromium --with-deps
+
+      - name: Run Chrome first-click audio and game startup test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-v120-web
+          cat > qa-v120-web/check.cjs <<'JS'
+          const {chromium} = require('playwright');
+          (async () => {
+            const browser=await chromium.launch({
+              headless:true,
+              args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader',
+                    '--autoplay-policy=user-gesture-required','--no-sandbox']
+            });
+            const context=await browser.newContext({viewport:{width:1280,height:720}});
+            const page=await context.newPage();
+            const errors=[];
+            const consoleLines=[];
+            page.on('pageerror',e=>errors.push('PAGEERROR '+e.message));
+            page.on('requestfailed',r=>errors.push('REQUEST '+r.url()+' '+r.failure()?.errorText));
+            page.on('console',m=>{if(m.type()==='error')consoleLines.push(m.text())});
+            await page.addInitScript(() => {
+              window.__hansanAudioContexts=[];
+              for(const key of ['AudioContext','webkitAudioContext']){
+                const Base=window[key];
+                if(!Base)continue;
+                function Capture(){
+                  const ctx=Reflect.construct(Base,Array.from(arguments),Base);
+                  window.__hansanAudioContexts.push(ctx);
+                  return ctx;
+                }
+                Object.setPrototypeOf(Capture,Base);
+                Capture.prototype=Base.prototype;
+                window[key]=Capture;
+              }
+            });
+            const target='https://walexjung.github.io/hansan-demo/?audioqa='+Date.now();
+            console.log('CHECK_WEB_URL',target);
+            await page.goto(target,{waitUntil:'domcontentloaded',timeout:120000});
+            const button=page.locator('#hansan-enable-audio');
+            await button.waitFor({state:'visible',timeout:160000});
+            console.log('V120_WEB_LOADED_AUDIO_START_BUTTON');
+            const before=await page.evaluate(()=>window.__hansanAudioContexts.map(c=>c.state));
+            console.log('AUDIO_CONTEXT_BEFORE_CLICK',JSON.stringify(before));
+            await button.click();
+            await page.waitForTimeout(2000);
+            const after=await page.evaluate(()=>window.__hansanAudioContexts.map(c=>c.state));
+            console.log('AUDIO_CONTEXT_AFTER_CLICK',JSON.stringify(after));
+            const size=await page.locator('#canvas').evaluate(c=>[c.width,c.height]);
+            console.log('GAME_CANVAS_SIZE',JSON.stringify(size));
+            await page.screenshot({path:'qa-v120-web/after-audio-start.png'});
+            if(errors.length)console.log('BROWSER_ERRORS',JSON.stringify(errors.slice(0,30)));
+            if(consoleLines.length)console.log('CONSOLE_ERRORS',JSON.stringify(consoleLines.slice(0,30)));
+            const ok=after.length>0 && after.every(x=>x==='running') && size[0]>0 && size[1]>0;
+            console.log('V120_BROWSER_AUDIO_UNLOCK',ok?'PASS':'FAIL');
+            await browser.close();
+            if(!ok)process.exit(1);
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+          node qa-v120-web/check.cjs | tee qa-v120-web/results.log
+
+      - name: Save browser screenshot and audio QA trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v120-chrome-audio-unlock-qa
+          path: qa-v120-web/
+          retention-days: 30
+          if-no-files-found: warn
