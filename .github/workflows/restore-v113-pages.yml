@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   actions: read
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
@@ -19,6 +19,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
       - name: Get already-verified GitHub Pages build
         uses: actions/download-artifact@v4
         with:
@@ -33,16 +34,47 @@ jobs:
           tar -tf "${{ runner.temp }}/saved-pages/artifact.tar" > "${{ runner.temp }}/pages-contents.txt"
           grep -F 'hansan-demo/index.html' "${{ runner.temp }}/pages-contents.txt"
           grep -F 'hansan-demo/index.pck' "${{ runner.temp }}/pages-contents.txt"
+      - name: Restore demo files on main and stage current site
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/previous-site" "$RUNNER_TEMP/pages-site"
+          tar -xf "$RUNNER_TEMP/saved-pages/artifact.tar" -C "$RUNNER_TEMP/previous-site"
+          previous="$RUNNER_TEMP/previous-site/hansan-demo"
+          for file in index.html index.js index.pck index.wasm; do
+            test -s "$previous/$file"
+          done
+          test "$(sha256sum "$previous/index.pck" | cut -d ' ' -f1)" != "$(sha256sum hansan-demo/index.pck | cut -d ' ' -f1)" || cmp -s "$previous/index.html" hansan-demo/index.html
+          git rm -r --ignore-unmatch -- hansan-demo
+          mkdir -p hansan-demo
+          cp -a "$previous/." hansan-demo/
+          git add -- hansan-demo
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Restore V113 demo and remove full V120 from current public files'
+            git push origin HEAD:main
+          fi
+          git archive HEAD | tar -xf - -C "$RUNNER_TEMP/pages-site"
+          rm -rf "$RUNNER_TEMP/pages-site/.github"
+          echo "DEMO_PCK_SHA256=$(sha256sum hansan-demo/index.pck | cut -d ' ' -f1)" >> "$GITHUB_ENV"
       - name: Repackage Pages deployment artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages-v113-attempt-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/saved-pages/artifact.tar
-          retention-days: 90
-          compression-level: 0
-          if-no-files-found: error
+          name: github-pages-v113-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pages-site
       - name: Deploy verified V113 to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          artifact_name: github-pages-v113-attempt-${{ github.run_attempt }}
+          artifact_name: github-pages-v113-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify public Pages serves restored PCK
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..10}; do
+            if curl -fsSL --max-time 45 "https://walexjung.github.io/hansan-demo/index.pck?restore=$GITHUB_RUN_ID-$attempt" -o "$RUNNER_TEMP/live.pck" &&
+               echo "$DEMO_PCK_SHA256  $RUNNER_TEMP/live.pck" | sha256sum -c -; then
+              exit 0
+            fi
+            sleep 6
+          done
+          exit 1
