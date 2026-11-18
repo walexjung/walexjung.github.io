@@ -42,6 +42,7 @@ jobs:
           (async () => {
             const browser=await chromium.launch({
               headless:true,
+              ignoreDefaultArgs:['--mute-audio'],
               executablePath:process.env.BROWSER_CHROME_BIN || undefined,
               args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader',
                     '--autoplay-policy=user-gesture-required','--no-sandbox']
@@ -61,7 +62,11 @@ jobs:
                 const result=connect.call(this,destination,...args);
                 if(destination===this.context.destination){
                   const analyser=this.context.createAnalyser();
-                  connect.call(this,analyser,args[0]||0);
+                  const silence=this.context.createGain();
+                silence.gain.value=0;
+                connect.call(this,analyser,args[0]||0);
+                connect.call(analyser,silence);
+                connect.call(silence,destination);
                   window.__hansanAnalysers.push(analyser);
                 }
                 return result;
@@ -79,7 +84,7 @@ jobs:
                 window[key]=Capture;
               }
             });
-            const target='https://walexjung.github.io/hansan-demo/?audioqa='+Date.now();
+            const target='https://walexjung.github.io/hansan-demo/?lang=ko&audioqa='+Date.now();
             console.log('CHECK_WEB_URL',target);
             await page.goto(target,{waitUntil:'domcontentloaded',timeout:120000});
             const button=page.locator('#hansan-enable-audio');
