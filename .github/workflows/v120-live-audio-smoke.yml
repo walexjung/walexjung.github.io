@@ -1,4 +1,4 @@
-name: V120 live browser and audio-unlock smoke test
+name: V120 demo live browser and audio signal check
 on:
   push:
     branches: [main]
@@ -55,6 +55,17 @@ jobs:
             page.on('console',m=>{if(m.type()==='error')consoleLines.push(m.text())});
             await page.addInitScript(() => {
               window.__hansanAudioContexts=[];
+              window.__hansanAnalysers=[];
+              const connect=AudioNode.prototype.connect;
+              AudioNode.prototype.connect=function(destination,...args){
+                const result=connect.call(this,destination,...args);
+                if(destination===this.context.destination){
+                  const analyser=this.context.createAnalyser();
+                  connect.call(this,analyser,args[0]||0);
+                  window.__hansanAnalysers.push(analyser);
+                }
+                return result;
+              };
               for(const key of ['AudioContext','webkitAudioContext']){
                 const Base=window[key];
                 if(!Base)continue;
@@ -77,7 +88,16 @@ jobs:
             const before=await page.evaluate(()=>window.__hansanAudioContexts.map(c=>c.state));
             console.log('AUDIO_CONTEXT_BEFORE_CLICK',JSON.stringify(before));
             await button.click();
-            await page.waitForTimeout(2000);
+            const signal=await page.waitForFunction(() => {
+              let peak=0;
+              for(const analyser of window.__hansanAnalysers){
+                const samples=new Float32Array(analyser.fftSize);
+                analyser.getFloatTimeDomainData(samples);
+                for(const sample of samples) peak=Math.max(peak,Math.abs(sample));
+              }
+              return peak>0.001 ? peak : false;
+            },null,{timeout:30000,polling:100});
+            console.log('AUDIO_SIGNAL_PEAK',await signal.jsonValue());
             const after=await page.evaluate(()=>window.__hansanAudioContexts.map(c=>c.state));
             console.log('AUDIO_CONTEXT_AFTER_CLICK',JSON.stringify(after));
             const size=await page.locator('#canvas').evaluate(c=>[c.width,c.height]);
