@@ -1,0 +1,46 @@
+name: Restore verified Hansan V113 Pages artifact
+on:
+  push:
+    paths:
+      - .github/workflows/restore-v113-pages.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Get already-verified GitHub Pages build
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          run-id: 44204646839
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/saved-pages
+      - name: Confirm saved Pages archive
+        run: |
+          test -s "${{ runner.temp }}/saved-pages/artifact.tar"
+          tar -tzf "${{ runner.temp }}/saved-pages/artifact.tar" > "${{ runner.temp }}/pages-contents.txt"
+          grep -F 'hansan-demo/index.html' "${{ runner.temp }}/pages-contents.txt"
+          grep -F 'hansan-demo/index.pck' "${{ runner.temp }}/pages-contents.txt"
+      - name: Repackage Pages deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/saved-pages/artifact.tar
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+      - name: Deploy verified V113 to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
