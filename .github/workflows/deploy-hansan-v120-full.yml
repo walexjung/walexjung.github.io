@@ -1,0 +1,122 @@
+name: Deploy verified Hansan V120 web with browser sound recovery
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-hansan-v120-full.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: https://walexjung.github.io/hansan-demo/
+    steps:
+      - name: Checkout existing website preserving homepage and other content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download independently verified V120 web build
+        env:
+          WEB_BUILD_ASSET_URL: "https://sdmntprjapaneast.oaiusercontent.com/files/00000000-8e10-8209-87da-c6bbcc780cf5/raw?se=2026-11-18T10%3A51%3A51Z&sp=r&sv=2026-06-06&sr=b&scid=7b9402a5-277e-5b56-92b8-ead3e11e4784&skoid=bb372dd6-3b2a-4af2-b355-c26497ba23cd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-18T04%3A18%3A34Z&ske=2026-11-19T04%3A18%3A34Z&sks=b&skv=2026-06-06&sig=0rFGgMDwkFaE3dvZaXzfEwbm4WDNiQLBm3ltrdaEPGs%3D"
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 240 \
+            --silent --show-error "$WEB_BUILD_ASSET_URL" \
+            --output "$RUNNER_TEMP/hansan-v120-artifact.zip"
+          test -s "$RUNNER_TEMP/hansan-v120-artifact.zip"
+          unzip -tq "$RUNNER_TEMP/hansan-v120-artifact.zip"
+          mkdir -p "$RUNNER_TEMP/build"
+          unzip -q "$RUNNER_TEMP/hansan-v120-artifact.zip" -d "$RUNNER_TEMP/build"
+          web="$RUNNER_TEMP/build/02_게임빌드/hansan-game/web"
+          if [[ ! -s "$web/index.html" ]]; then
+            web=$(dirname "$(find "$RUNNER_TEMP/build" -type f -name index.pck -print -quit)")
+          fi
+          test -s "$web/index.html"
+          test -s "$web/index.js"
+          test -s "$web/index.pck"
+          test -s "$web/index.wasm"
+          grep -Fq 'hansan-enable-audio' "$web/index.html"
+          grep -Fq 'window.__hansanAudioUnlockReady();' "$web/index.html"
+          wasm_bytes=$(stat -c %s "$web/index.wasm")
+          pck_bytes=$(stat -c %s "$web/index.pck")
+          test "$wasm_bytes" -gt 30000000
+          test "$pck_bytes" -gt 60000000
+          test "$pck_bytes" -lt 104857600
+          echo "WEB_V120_ARTIFACT_VERIFIED pck=$pck_bytes wasm=$wasm_bytes"
+          echo "WEB_DIR=$web" >> "$GITHUB_ENV"
+
+      - name: Replace only hansan-demo in public GitHub repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s index.html
+          sha_before=$(sha256sum index.html | awk '{print $1}')
+          rm -rf hansan-demo
+          mkdir -p hansan-demo
+          cp -a "$WEB_DIR/." hansan-demo/
+          touch .nojekyll
+          sha_after=$(sha256sum index.html | awk '{print $1}')
+          test "$sha_before" = "$sha_after"
+          test -s hansan-demo/index.html
+          test -s hansan-demo/index.pck
+          test -s hansan-demo/index.wasm
+          grep -Fq 'hansan-enable-audio' hansan-demo/index.html
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- hansan-demo .nojekyll
+          git commit -m 'deploy: complete V120 Hansan web with audio repair; preserve homepage'
+          git push origin HEAD:main
+          echo 'V120_PUBLIC_REPOSITORY_UPDATED'
+          echo "V120_DEPLOY_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Prepare full website without source Git metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pages-site"
+          tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
+          test -s "$RUNNER_TEMP/pages-site/index.html"
+          test -s "$RUNNER_TEMP/pages-site/hansan-demo/index.pck"
+          grep -Fq 'hansan-enable-audio' "$RUNNER_TEMP/pages-site/hansan-demo/index.html"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages-site
+
+      - name: Deploy new website to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify public website actually serves new V120 HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://walexjung.github.io/hansan-demo/?v=$GITHUB_RUN_ID"
+          for i in 1 2 3 4 5; do
+            if curl --silent --show-error --fail --location --max-time 30 "$url" | grep -Fq 'hansan-enable-audio'; then
+              echo 'V120_PUBLIC_PAGE_VERIFIED_AUDIO_START_SCREEN'
+              break
+            fi
+            if [[ "$i" == 5 ]]; then
+              echo "::warning::Public CDN may not yet serve new HTML"
+            fi
+            sleep 6
+          done
+          echo "Public site: https://walexjung.github.io/hansan-demo/"
+          echo "Repository source: walexjung/walexjung.github.io, commit $V120_DEPLOY_COMMIT"
