@@ -1,10 +1,11 @@
 name: Deploy verified Hansan V120 web with browser sound recovery
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/deploy-hansan-v120-full.yml
   workflow_dispatch:
+    inputs:
+      signed_artifact_url:
+        description: "Temporary signed URL of the verified V120 web build"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -30,7 +31,7 @@ jobs:
 
       - name: Download independently verified V120 web build
         env:
-          WEB_BUILD_ASSET_URL: "https://sdmntprjapaneast.oaiusercontent.com/files/00000000-8e10-8209-87da-c6bbcc780cf5/raw?se=2026-11-18T10%3A51%3A51Z&sp=r&sv=2026-06-06&sr=b&scid=7b9402a5-277e-5b56-92b8-ead3e11e4784&skoid=bb372dd6-3b2a-4af2-b355-c26497ba23cd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-18T04%3A18%3A34Z&ske=2026-11-19T04%3A18%3A34Z&sks=b&skv=2026-06-06&sig=0rFGgMDwkFaE3dvZaXzfEwbm4WDNiQLBm3ltrdaEPGs%3D"
+          WEB_BUILD_ASSET_URL: ${{ inputs.signed_artifact_url }}
         shell: bash
         run: |
           set -euo pipefail
