@@ -1,0 +1,93 @@
+name: Publish verified Hansan V121 English/Korean two-act demo
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-verified-v121.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: https://walexjung.github.io/hansan-demo/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Download verified V121 artifact and verify SHA256
+        env:
+          DEMO_ARCHIVE_URL: "https://sdmntprindiasocentral.oaiusercontent.com/files/00000000-3e44-8211-aaf4-f204fc44c4f4/raw?se=2026-11-19T12%3A23%3A59Z&sp=r&sv=2026-06-06&sr=b&scid=ce66b37d-c8e9-544f-a2d3-aff9f230a448&skoid=bb372dd6-3b2a-4af2-b355-c26497ba23cd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-18T20%3A30%3A20Z&ske=2026-11-19T20%3A30%3A20Z&sks=b&skv=2026-06-06&sig=9V2tF6i%2BJ%2BVUnaS6OcboMcN46QEdBq9LNkvNJaSlIx0%3D"
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 230 --silent --show-error "$DEMO_ARCHIVE_URL" -o "$RUNNER_TEMP/v121.zip"
+          echo '679ff0133525c41373065573ebd0e387e10a03001a07369c8d058c793b193a7c  '+"$RUNNER_TEMP/v121.zip" | sha256sum -c -
+          unzip -tq "$RUNNER_TEMP/v121.zip"
+          mkdir -p "$RUNNER_TEMP/v121"
+          unzip -q "$RUNNER_TEMP/v121.zip" '02_게임빌드/hansan-game/web/*' -d "$RUNNER_TEMP/v121"
+          web="$RUNNER_TEMP/v121/02_게임빌드/hansan-game/web"
+          for f in index.html index.pck index.js index.wasm; do test -s "$web/$f"; done
+          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  '+"$web/index.pck" | sha256sum -c -
+          echo '5dbc61f1c60cad405524489816ef0ae945a8ab85d38ce70be92019a27a1fbe57  '+"$web/index.html" | sha256sum -c -
+          test "$(stat -c %s "$web/index.pck")" -eq 71044704
+          grep -Fq 'hansan-enable-audio' "$web/index.html"
+          echo "V121_WEB_SOURCE_VERIFIED"
+      - name: Replace only hansan-demo, preserving all existing homepage files
+        shell: bash
+        run: |
+          set -euo pipefail
+          home_before=$(sha256sum index.html | awk '{print $1}')
+          rm -rf hansan-demo
+          mkdir -p hansan-demo
+          cp -a "$RUNNER_TEMP/v121/02_게임빌드/hansan-game/web/." hansan-demo/
+          touch .nojekyll
+          home_after=$(sha256sum index.html | awk '{print $1}')
+          test "$home_before" = "$home_after"
+          for f in index.html index.pck index.js index.wasm; do test -s "hansan-demo/$f"; done
+          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  hansan-demo/index.pck' | sha256sum -c -
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- hansan-demo .nojekyll
+          git commit -m 'deploy: verified V121 EN/KO Chapter 1 Acts 1-2 web demo'
+          git push origin HEAD:main
+          echo "V121_PUBLIC_REPO_UPDATED"
+      - name: Assemble Pages site
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pages-site"
+          tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
+          test -s "$RUNNER_TEMP/pages-site/index.html"
+          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  '+"$RUNNER_TEMP/pages-site/hansan-demo/index.pck" | sha256sum -c -
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages-site
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Check that V121 is served publicly
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://walexjung.github.io/hansan-demo/index.html?v='+"$GITHUB_RUN_ID"
+          verified=0
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL --connect-timeout 10 --max-time 25 "$url" -o "$RUNNER_TEMP/live-index.html"; then
+              if echo '5dbc61f1c60cad405524489816ef0ae945a8ab85d38ce70be92019a27a1fbe57  '+"$RUNNER_TEMP/live-index.html" | sha256sum -c -; then
+                verified=1; break
+              fi
+            fi
+            sleep 8
+          done
+          test "$verified" = 1
+          echo 'V121_LIVE_HTML_SHA_VERIFIED'
+          echo 'V121 demo: https://walexjung.github.io/hansan-demo/'
