@@ -30,14 +30,14 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 --connect-timeout 20 --max-time 230 --silent --show-error "$DEMO_ARCHIVE_URL" -o "$RUNNER_TEMP/v121.zip"
-          echo '679ff0133525c41373065573ebd0e387e10a03001a07369c8d058c793b193a7c  '+"$RUNNER_TEMP/v121.zip" | sha256sum -c -
+          echo '679ff0133525c41373065573ebd0e387e10a03001a07369c8d058c793b193a7c  '"$RUNNER_TEMP/v121.zip" | sha256sum -c -
           unzip -tq "$RUNNER_TEMP/v121.zip"
           mkdir -p "$RUNNER_TEMP/v121"
           unzip -q "$RUNNER_TEMP/v121.zip" '02_게임빌드/hansan-game/web/*' -d "$RUNNER_TEMP/v121"
           web="$RUNNER_TEMP/v121/02_게임빌드/hansan-game/web"
           for f in index.html index.pck index.js index.wasm; do test -s "$web/$f"; done
-          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  '+"$web/index.pck" | sha256sum -c -
-          echo '5dbc61f1c60cad405524489816ef0ae945a8ab85d38ce70be92019a27a1fbe57  '+"$web/index.html" | sha256sum -c -
+          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  '"$web/index.pck" | sha256sum -c -
+          echo '5dbc61f1c60cad405524489816ef0ae945a8ab85d38ce70be92019a27a1fbe57  '"$web/index.html" | sha256sum -c -
           test "$(stat -c %s "$web/index.pck")" -eq 71044704
           grep -Fq 'hansan-enable-audio' "$web/index.html"
           echo "V121_WEB_SOURCE_VERIFIED"
@@ -66,7 +66,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pages-site"
           tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
           test -s "$RUNNER_TEMP/pages-site/index.html"
-          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  '+"$RUNNER_TEMP/pages-site/hansan-demo/index.pck" | sha256sum -c -
+          echo '22a233479047945b5f0e8aab4c8ccd9367db1d87d429e7ff381ca0134a3fdbbc  '"$RUNNER_TEMP/pages-site/hansan-demo/index.pck" | sha256sum -c -
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -78,11 +78,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://walexjung.github.io/hansan-demo/index.html?v='+"$GITHUB_RUN_ID"
+          url='https://walexjung.github.io/hansan-demo/index.html?v='"$GITHUB_RUN_ID"
           verified=0
           for attempt in 1 2 3 4 5; do
             if curl -fsSL --connect-timeout 10 --max-time 25 "$url" -o "$RUNNER_TEMP/live-index.html"; then
-              if echo '5dbc61f1c60cad405524489816ef0ae945a8ab85d38ce70be92019a27a1fbe57  '+"$RUNNER_TEMP/live-index.html" | sha256sum -c -; then
+              if echo '5dbc61f1c60cad405524489816ef0ae945a8ab85d38ce70be92019a27a1fbe57  '"$RUNNER_TEMP/live-index.html" | sha256sum -c -; then
                 verified=1; break
               fi
             fi
