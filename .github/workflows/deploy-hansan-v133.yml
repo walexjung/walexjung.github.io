@@ -1,0 +1,61 @@
+name: Deploy Hansan V133 web demo to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'hansan-demo/**'
+      - .github/workflows/deploy-hansan-v133.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: https://walexjung.github.io/hansan-demo/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Check files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s index.html
+          for f in index.html index.js index.pck index.wasm; do test -s "hansan-demo/$f"; done
+          grep -Fq 'hansan-enable-audio' hansan-demo/index.html
+          pck=$(stat -c %s hansan-demo/index.pck); test "$pck" -gt 60000000
+          echo "HANSAN_V133_FILES_OK pck=$pck"
+          mkdir -p "$RUNNER_TEMP/pages-site"
+          tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages-site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify live page and pack size
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://walexjung.github.io/hansan-demo/?v=$GITHUB_RUN_ID"
+          for i in 1 2 3 4 5 6; do
+            if curl -sSfL --max-time 30 "$url" | grep -Fq 'hansan-enable-audio'; then echo LIVE_HTML_OK; break; fi
+            [ "$i" = 6 ] && { echo '::warning::CDN not yet updated'; break; }
+            sleep 8
+          done
+          live=$(curl -sSIL --max-time 30 "https://walexjung.github.io/hansan-demo/index.pck?v=$GITHUB_RUN_ID" | grep -i '^content-length' | tail -1 | tr -dc 0-9)
+          local=$(stat -c %s hansan-demo/index.pck)
+          echo "pck live=$live local=$local"
+          test "$live" = "$local" && echo LIVE_PCK_SIZE_MATCH
