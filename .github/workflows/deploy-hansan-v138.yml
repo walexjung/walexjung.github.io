@@ -1,10 +1,10 @@
-name: Deploy Hansan V137 web demo to GitHub Pages
+name: Deploy Hansan V138 web demo to GitHub Pages
 on:
   push:
     branches: [main]
     paths:
       - 'hansan-demo/**'
-      - .github/workflows/deploy-hansan-v137.yml
+      - .github/workflows/deploy-hansan-v138.yml
   workflow_dispatch:
 
 permissions:
@@ -35,7 +35,7 @@ jobs:
           for f in index.html index.js index.pck index.wasm; do test -s "hansan-demo/$f"; done
           grep -Fq 'hansan-enable-audio' hansan-demo/index.html
           pck=$(stat -c %s hansan-demo/index.pck); test "$pck" -gt 60000000
-          echo "HANSAN_V137_FILES_OK pck=$pck"
+          echo "HANSAN_V138_FILES_OK pck=$pck"
           mkdir -p "$RUNNER_TEMP/pages-site"
           tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
       - uses: actions/configure-pages@v5
