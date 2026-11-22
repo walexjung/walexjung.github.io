@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'myeongnyang-demo/**'
+      - 'myeongnyang-test/**'
       - .github/workflows/deploy-myeongnyang-demo.yml
   workflow_dispatch:
 
@@ -37,6 +38,7 @@ jobs:
           grep -Fq 'mn-enable-audio' myeongnyang-demo/index.html
           pck=$(stat -c %s myeongnyang-demo/index.pck); test "$pck" -gt 50000000
           echo "MN_DEMO_FILES_OK pck=$pck"
+          if [ -d myeongnyang-test ]; then for f in index.html index.js index.pck index.wasm; do test -s "myeongnyang-test/$f"; done; echo "MN_TEST_FILES_OK pck=$(stat -c %s myeongnyang-test/index.pck)"; fi
           mkdir -p "$RUNNER_TEMP/pages-site"
           tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
       - uses: actions/configure-pages@v5
@@ -61,3 +63,9 @@ jobs:
           echo "pck live=$live local=$local"
           test "$live" = "$local" && echo LIVE_PCK_SIZE_MATCH
           curl -sSfL --max-time 30 "https://walexjung.github.io/hansan-demo/?v=$GITHUB_RUN_ID" | grep -Fq 'hansan-enable-audio' && echo HANSAN_STILL_LIVE
+          if [ -d myeongnyang-test ]; then
+            tl=$(curl -sSIL --max-time 30 "https://walexjung.github.io/myeongnyang-test/index.pck?v=$GITHUB_RUN_ID" | grep -i '^content-length' | tail -1 | tr -dc 0-9)
+            tc=$(stat -c %s myeongnyang-test/index.pck)
+            echo "test pck live=$tl local=$tc"
+            test "$tl" = "$tc" && echo LIVE_TEST_PCK_SIZE_MATCH
+          fi
