@@ -5,6 +5,7 @@ on:
     paths:
       - 'myeongnyang-demo/**'
       - 'myeongnyang-test/**'
+      - 'noryang-test/**'
       - .github/workflows/deploy-myeongnyang-demo.yml
   workflow_dispatch:
 
