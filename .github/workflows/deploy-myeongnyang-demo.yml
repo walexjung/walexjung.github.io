@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           test -s index.html
           for d in hansan-demo myeongnyang-demo; do for f in index.html index.js index.pck index.wasm; do test -s "$d/$f"; done; done
-          grep -Fq 'hansan-enable-audio' hansan-demo/index.html
+          # 한산 V139부터 '소리 켜기' 덮개가 없다(deploy-hansan-v139.yml 이 확인) — 여기서는 파일이 있는지만 본다
           grep -Fq 'mn-enable-audio' myeongnyang-demo/index.html
           pck=$(stat -c %s myeongnyang-demo/index.pck); test "$pck" -gt 50000000
           echo "MN_DEMO_FILES_OK pck=$pck"
@@ -62,7 +62,7 @@ jobs:
           local=$(stat -c %s myeongnyang-demo/index.pck)
           echo "pck live=$live local=$local"
           test "$live" = "$local" && echo LIVE_PCK_SIZE_MATCH
-          curl -sSfL --max-time 30 "https://walexjung.github.io/hansan-demo/?v=$GITHUB_RUN_ID" | grep -Fq 'hansan-enable-audio' && echo HANSAN_STILL_LIVE
+          curl -sSfL --max-time 30 "https://walexjung.github.io/hansan-demo/?v=$GITHUB_RUN_ID" | grep -Fqi '<canvas' && echo HANSAN_STILL_LIVE
           if [ -d myeongnyang-test ]; then
             tl=$(curl -sSIL --max-time 30 "https://walexjung.github.io/myeongnyang-test/index.pck?v=$GITHUB_RUN_ID" | grep -i '^content-length' | tail -1 | tr -dc 0-9)
             tc=$(stat -c %s myeongnyang-test/index.pck)
