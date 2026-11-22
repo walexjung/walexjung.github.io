@@ -93,16 +93,8 @@ body {
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 
-	<style id="hansan-audio-style">
-#hansan-enable-audio {display:none;position:fixed;inset:0;z-index:9999;border:0;
- width:100%;height:100%;background:rgba(18,12,8,.88);color:#f5d8a3;
- cursor:pointer;flex-direction:column;align-items:center;justify-content:center;
- gap:14px;text-align:center;font:700 22px sans-serif;}
-#hansan-enable-audio small {font-size:14px;font-weight:400;color:#e0c59d}
-</style></head>
-	<body><button type="button" id="hansan-enable-audio" aria-label="소리를 켜고 게임 시작">
-<span id="hansan-audio-title">🔊 소리를 켜고 게임 시작</span>
-<small id="hansan-audio-subtitle">클릭 또는 터치하면 웹 게임의 소리가 활성화됩니다</small></button>
+	</head>
+	<body>
 		<canvas id="canvas">
 			Your browser does not support the canvas tag.
 		</canvas>
@@ -119,6 +111,10 @@ body {
 
 		<script id="hansan-audio-bootstrap">
 (function(){
+ // Browsers keep audio suspended until the player clicks, taps or presses a key.
+ // The first screen (language choice) needs exactly such a gesture, so audio is
+ // resumed on it without covering the game: one click picks the language AND
+ // turns the sound on. Listeners stay on in case the browser suspends audio again.
  const contexts=[];
  for (const name of ["AudioContext","webkitAudioContext"]) {
   const Orig=window[name];if(!Orig)continue;
@@ -130,31 +126,17 @@ body {
   window[name]=Capture;
  }
  function resume() {
-  for(const ctx of contexts)if(ctx.state!=="running"){
+  for(const ctx of contexts)if(ctx.state!=="running"&&ctx.state!=="closed"){
    try{const p=ctx.resume();if(p&&p.catch)p.catch(console.warn);}
    catch(e){console.warn("Hansan audio unlock:",e);}
   }
  }
- window.addEventListener("pointerdown",resume,true);
- window.addEventListener("keydown",resume,true);
- const btn=document.getElementById("hansan-enable-audio");
- function start(){resume();btn.remove();document.getElementById("canvas").focus();}
- btn.addEventListener("pointerdown",start,{once:true});
- btn.addEventListener("keydown",function(e){
-  if(e.key==="Enter"||e.key===" "){e.preventDefault();start();}
- });
- window.__hansanAudioUnlockReady=function(){
-  if(!btn.isConnected)return;
-  const params=new URLSearchParams(location.search);
-  const en=params.get("lang")==="en"||
-    (!params.has("lang")&&!navigator.language.toLowerCase().startsWith("ko"));
-  if(en){
-   document.getElementById("hansan-audio-title").textContent="🔊 Enable sound and start";
-   document.getElementById("hansan-audio-subtitle").textContent=
-     "Click or tap to enable audio in your browser";
-  }
-  btn.style.display="flex";btn.focus();
- };
+ // Touch only counts as a user gesture on release, mouse on press: listen to both.
+ for (const type of ["pointerdown","pointerup","mousedown","mouseup",
+                     "touchstart","touchend","click","keydown","keyup"]) {
+  window.addEventListener(type,resume,{capture:true,passive:true});
+ }
+ window.__hansanAudioContexts=contexts;
 })();
 </script><script src="index.js"></script>
 		<script>
@@ -258,7 +240,6 @@ const engine = new Engine(GODOT_CONFIG);
 			},
 		}).then(() => {
 			setStatusMode('hidden');
-            window.__hansanAudioUnlockReady();
 		}, displayFailureNotice);
 	}
 }());
