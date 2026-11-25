@@ -1,4 +1,4 @@
-name: Deploy Hansan V146 web demo to GitHub Pages
+name: Deploy Hansan V147 web demo to GitHub Pages
 on:
   push:
     branches: [main]
@@ -36,7 +36,7 @@ jobs:
           grep -Fq 'hansan-audio-bootstrap' hansan-demo/index.html
           ! grep -Fq 'hansan-enable-audio' hansan-demo/index.html
           pck=$(stat -c %s hansan-demo/index.pck); test "$pck" -gt 60000000
-          echo "HANSAN_V146_FILES_OK pck=$pck"
+          echo "HANSAN_V147_FILES_OK pck=$pck"
           mkdir -p "$RUNNER_TEMP/pages-site"
           tar --exclude=.git --exclude=.github -cf - . | (cd "$RUNNER_TEMP/pages-site" && tar -xf -)
       - uses: actions/configure-pages@v5
