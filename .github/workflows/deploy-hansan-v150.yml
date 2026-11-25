@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'hansan-demo/**'
+      - 'hansan-test/**'
       - .github/workflows/deploy-hansan-v142.yml
   workflow_dispatch:
 
