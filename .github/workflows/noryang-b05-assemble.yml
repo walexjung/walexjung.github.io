@@ -1,0 +1,69 @@
+name: Publish NR-B05 normal demo and isolated browser QA
+on:
+  push:
+    paths:
+      - .github/workflows/noryang-b05-assemble.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble binary resource packs and verify original exact git blob SHA
+        run: |
+          python3 - <<'PY'
+          import base64,hashlib,json,pathlib,shutil
+          origin=pathlib.Path('.github/nr-b05-assembly')
+          manifest=json.loads((origin/'manifest.json').read_text())
+          def assemble(kind):
+              info=manifest[kind]
+              parts=sorted((origin/kind).glob('*.b64'))
+              assert len(parts)==info['pieces'],(kind,len(parts),info['pieces'])
+              s=''.join(p.read_text().strip() for p in parts)
+              data=base64.b64decode(s,validate=True)
+              assert len(data)==info['bytes'],kind
+              assert hashlib.sha256(data).hexdigest()==info['sha256'],kind
+              blob=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              assert blob==info['git_blob_sha'],(kind,blob,info['git_blob_sha'])
+              print('QA_VERIFIED_PCK',kind,len(data),info['sha256'],blob,flush=True)
+              return data
+          normal=assemble('public')
+          qa=assemble('qa')
+          from pathlib import Path
+          Path('noryang-demo').mkdir(exist_ok=True)
+          Path('noryang-test/qa').mkdir(exist_ok=True)
+          names=['index.html','index.js','index.wasm','index.audio.worklet.js','index.audio.position.worklet.js','index.png','index.icon.png','index.apple-touch-icon.png']
+          for filename in names:
+              f=Path('noryang-test')/filename
+              assert f.exists(),f
+              shutil.copyfile(f,Path('noryang-demo')/filename)
+              shutil.copyfile(f,Path('noryang-test/qa')/filename)
+          # Keep noindex for test site; the player-facing demo page should be indexable.
+          html=Path('noryang-demo/index.html')
+          t=html.read_text()
+          t=t.replace('<meta name="robots" content="noindex, nofollow">','')
+          html.write_text(t)
+          for site,pck in [('noryang-demo',normal),('noryang-test',normal),('noryang-test/qa',qa)]:
+              p=Path(site)
+              (p/'index.pck').write_bytes(pck)
+              obj={'game':'노량: 마지막 일기','build':'NR-B05','date':'2026-11-27','source_repo':'walexjung/noryang','plan':'V06','art':'first-pass','bundle':'qa' if '/qa' in site else 'normal','pck_sha256':hashlib.sha256(pck).hexdigest()}
+              (p/'RELEASE.json').write_text(json.dumps(obj,indent=2,ensure_ascii=False)+'\n')
+              print('QA_READY_PUBLIC_PATH',site,len(pck),flush=True)
+          assert Path('noryang-demo/index.pck').read_bytes()==Path('noryang-test/index.pck').read_bytes()
+          assert Path('noryang-test/qa/index.pck').read_bytes()!=Path('noryang-test/index.pck').read_bytes()
+          PY
+      - name: Commit all 3 public-facing locations without changing other website projects
+        run: |
+          set -euo pipefail
+          git config user.name 'noryang-pages-release-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add noryang-demo noryang-test
+          git rm -r .github/nr-b05-assembly
+          if git diff --cached --quiet; then echo 'QA_PAGES_NO_CHANGE'; exit 0; fi
+          git commit -m 'Publish NR-B05 curated-art playable demo, test and isolated QA engine'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'QA_PAGES_PUBLISHED=true'
