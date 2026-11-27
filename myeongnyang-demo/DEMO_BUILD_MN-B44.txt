@@ -1,0 +1,6 @@
+MN-B44 | V12 | 공개 프리데모 1장 1~2막 전용
+act_count=2 room_count=5 node_count=78 translation_entries=556
+후기 막 JSON 및 비사용 그래픽·리소스 제외
+source=walexjung.github.io/myeongnyang-test/index.pck (MN-B44)
+pck_bytes=64297036
+ee1e1f6a5a86b228548ffba34886a8c9d9a5c40d4ba45b81c89e601c98a66415  myeongnyang-demo/index.pck
