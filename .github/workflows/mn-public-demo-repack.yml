@@ -1,0 +1,104 @@
+name: Repack MN-B44 public preview (filtered before publish)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/mn-public-demo-repack.yml"
+      - ".github/scripts/mn_make_public_demo_from_pack.gd"
+      - ".github/demo-data/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test-filtered-pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: false
+
+      - name: Verify MN-B44 source test PCK and public-only dialogue
+        run: |
+          set -euo pipefail
+          test "$(stat -c %s myeongnyang-test/index.pck)" = 70699300
+          python3 - <<'PY'
+          import json
+          d=json.load(open('.github/demo-data/mn-b44-ch1.json'))
+          en=json.load(open('.github/demo-data/mn-b44-en.json'))
+          assert set(d['acts']) == {'1-1', '1-2'}
+          assert len(d['rooms'])==5 and len(d['objects'])==16
+          assert len(d['nodes'])==78 and len(d['items'])==4
+          assert len(en)==556
+          for key in ['終', '5-1', '5-2', '5-3', '4-3', '2-3', '敵1', '☾1']:
+              assert key not in d['acts']
+          print('DATA_SPLIT_CHECK_OK')
+          PY
+
+      - name: Build new Godot pack with only preview data and stage artwork
+        run: |
+          set -euo pipefail
+          godot --headless --script "$GITHUB_WORKSPACE/.github/scripts/mn_make_public_demo_from_pack.gd" \
+            -- "$GITHUB_WORKSPACE/myeongnyang-test/index.pck" \
+            "$GITHUB_WORKSPACE/.github/demo-data/mn-b44-ch1.json" \
+            "$GITHUB_WORKSPACE/.github/demo-data/mn-b44-en.json" \
+            "$GITHUB_WORKSPACE/myeongnyang-demo/index.candidate.pck" > pck_build.log 2>&1 || { tail -120 pck_build.log; exit 1; }
+          grep -F "DEMO_REPACK_OK" pck_build.log
+          test -s myeongnyang-demo/index.candidate.pck
+          cat pck_build.log | tail -40
+
+      - name: Launch the repacked preview through Godot with demo mode
+        run: |
+          set -euo pipefail
+          godot --headless --main-pack "$GITHUB_WORKSPACE/myeongnyang-demo/index.candidate.pck" \
+            --quit-after 35 -- --demo > demo_startup.log 2>&1 || { tail -120 demo_startup.log; exit 1; }
+          if grep -E 'SCRIPT ERROR|Parse Error|Invalid access|Failed to load|Resource file not found|Cannot open' demo_startup.log; then
+            tail -120 demo_startup.log
+            exit 1
+          fi
+          echo "DEMO_PACK_LAUNCH_OK"
+
+      - name: Construct candidate HTML with actual size and explicit demo mode
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib,re
+          root=pathlib.Path('myeongnyang-demo')
+          raw=(root/'index.html').read_text(encoding='utf-8')
+          m=re.search(r'const GODOT_CONFIG = (\{.*?\});',raw)
+          assert m
+          cfg=json.loads(m.group(1))
+          cfg['args']=['--','--demo']
+          cfg['fileSizes']['index.pck']=(root/'index.candidate.pck').stat().st_size
+          raw=raw[:m.start(1)]+json.dumps(cfg,ensure_ascii=False,separators=(',',':'))+raw[m.end(1):]
+          assert 'mn-enable-audio' in raw
+          raw=re.sub(r'<meta name="game-build"[^>]*>', '',raw)
+          raw=raw.replace('</head>','<meta name="game-build" content="MN-B44-Demo-1-1-1-2"></head>',1)
+          (root/'index.candidate.html').write_text(raw,encoding='utf-8')
+          assert cfg['fileSizes']['index.pck']<66_000_000
+          print('DEMO_CANDIDATE_HTML_OK',cfg['fileSizes']['index.pck'])
+          PY
+          { echo 'MN-B44 / V12 public preview | only 1-1 and 1-2';
+            echo "SOURCE_SHA=$GITHUB_SHA";
+            echo "CANDIDATE_PCK_BYTES=$(stat -c %s myeongnyang-demo/index.candidate.pck)";
+            sha256sum myeongnyang-demo/index.candidate.pck;
+          } > demo_verify.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MN-B44-filtered-public-demo-READY-TO-PUBLISH
+          path: |
+            myeongnyang-demo/index.candidate.pck
+            myeongnyang-demo/index.candidate.html
+            .github/demo-data/mn-b44-ch1.json
+            .github/demo-data/mn-b44-en.json
+            pck_build.log
+            demo_startup.log
+            demo_verify.log
+          retention-days: 7
+          if-no-files-found: error
