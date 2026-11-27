@@ -9,7 +9,8 @@ on:
       - ".github/demo-data/**"
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 jobs:
   test-filtered-pack:
@@ -102,3 +103,32 @@ jobs:
             demo_verify.log
           retention-days: 7
           if-no-files-found: error
+
+      - name: Publish verified B44 demo-only pack to public website
+        run: |
+          set -euo pipefail
+          test "$(stat -c %s myeongnyang-demo/index.candidate.pck)" = 64297036
+          grep -Fq 'MN-B44-Demo-1-1-1-2' myeongnyang-demo/index.candidate.html
+          mv myeongnyang-demo/index.candidate.pck myeongnyang-demo/index.pck
+          mv myeongnyang-demo/index.candidate.html myeongnyang-demo/index.html
+          {
+            echo 'MN-B44 | V12 | 공개 프리데모 1장 1~2막 전용';
+            echo 'act_count=2 room_count=5 node_count=78 translation_entries=556';
+            echo '후기 막 JSON 및 비사용 그래픽·리소스 제외';
+            echo 'source=walexjung.github.io/myeongnyang-test/index.pck (MN-B44)';
+            echo "pck_bytes=$(stat -c %s myeongnyang-demo/index.pck)";
+            sha256sum myeongnyang-demo/index.pck;
+          } > myeongnyang-demo/DEMO_BUILD_MN-B44.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add myeongnyang-demo/index.pck myeongnyang-demo/index.html myeongnyang-demo/DEMO_BUILD_MN-B44.txt
+          git commit -m "deploy(demo): MN-B44 1-1·1-2막 전용 웹데모, 후기 데이터 제거"
+          git push origin HEAD:main
+
+      - name: Trigger fresh GitHub Pages release and live size check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run deploy-myeongnyang-demo.yml --ref main
+          echo 'PAGES_DEPLOY_REQUESTED via workflow_dispatch; inspect workflow completion and live PCK size independently.'
