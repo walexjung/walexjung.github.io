@@ -1,0 +1,49 @@
+name: MN-B44 live full-test Godot browser smoke (KO and EN)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/mn-b44-live-browser-qa.yml"
+      - ".github/scripts/mn-b44-live-web-smoke.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  live-chromium:
+    name: "Live Godot WebGL / ${{ matrix.lang }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [ko, en]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install actual browser and QA dependencies
+        run: |
+          set -euo pipefail
+          cd .github/scripts
+          npm install --no-save playwright pngjs
+          npx playwright install --with-deps chromium
+      - name: Run actual live website Godot full test, two language modes
+        env:
+          QA_LANG: ${{ matrix.lang }}
+        run: |
+          set -o pipefail
+          cd .github/scripts
+          timeout 800s node mn-b44-live-web-smoke.mjs 2>&1 | tee "smoke-$QA_LANG.log"
+          test -s "web-qa/$QA_LANG/report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: "mn-b44-live-browser-${{ matrix.lang }}"
+          path: |
+            .github/scripts/web-qa/
+            .github/scripts/smoke-*.log
+          retention-days: 14
+          if-no-files-found: warn
