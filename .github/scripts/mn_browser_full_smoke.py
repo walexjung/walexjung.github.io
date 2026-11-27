@@ -74,13 +74,32 @@ async def main():
         events.append({"step":"language-choice","language":LANG})
         await page.wait_for_timeout(1300)
         await page.screenshot(path=str(OUT/"opening-start.png"))
-        # Opening needs 2 clicks/Esc: first arms skipping, second accepts it.
-        await page.mouse.click(*cv(530,300))
-        await page.wait_for_timeout(500)
-        await page.mouse.click(*cv(530,300))
-        await page.wait_for_timeout(3500)
+        # Click the REAL skip button, at (532..630, 10..36) in 640x360 canvas.
+        # Clicking arbitrary video content only arms skip and caused a false pass.
+        await page.mouse.click(*cv(581,22))
+        await page.wait_for_timeout(2500)
         await page.screenshot(path=str(OUT/"after-skip-title.png"))
-        # Attempt the title's new-game button; exact viewport uses 640x360.
+        # Distinguish actual title from still-playing full screen opening video:
+        # the opening has a wide black caption band across y=0..40.
+        def opening_top_black_ratio(path):
+            with Image.open(path) as im:
+                im=im.convert("RGB")
+                # Canvas is scaled to page pixels. Inspect area away from menu/skip.
+                xs=[int(im.width*x) for x in (0.15,0.25,0.35,0.45)]
+                ys=[int(im.height*y) for y in (0.03,0.05,0.08)]
+                colors=[im.getpixel((xx,yy)) for xx in xs for yy in ys]
+                return sum(max(rgb)<32 for rgb in colors)/len(colors)
+        black=opening_top_black_ratio(OUT/"after-skip-title.png")
+        events.append({"step":"title-verified","top_black_ratio":black})
+        if black>0.8:
+            # WebGL resizing may transition late; press Esc fallback and recapture.
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(1500)
+            await page.screenshot(path=str(OUT/"after-skip-title.png"))
+            black=opening_top_black_ratio(OUT/"after-skip-title.png")
+            events.append({"step":"title-escape-fallback","top_black_ratio":black})
+        assert black<0.8, "still in opening movie, not at title"
+        # Real title NEW GAME entry is at x~64-204, y~196-214.
         await page.mouse.click(*cv(122,206))
         await page.wait_for_timeout(3500)
         await page.screenshot(path=str(OUT/"after-new-game.png"))
