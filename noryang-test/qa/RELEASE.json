@@ -1,0 +1,10 @@
+{
+  "game": "노량: 마지막 일기",
+  "build": "NR-B05",
+  "date": "2026-11-27",
+  "source_repo": "walexjung/noryang",
+  "plan": "V06",
+  "art": "first-pass",
+  "bundle": "qa",
+  "pck_sha256": "c1bc4133dc161e8ebe06687ad872df9305b484f0634583e024b3115383ae7725"
+}
