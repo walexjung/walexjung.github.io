@@ -1,0 +1,47 @@
+name: MN-B44 independent live Chromium full-test web smoke
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/mn-b44-browser-full-smoke.yml"
+      - ".github/scripts/mn_browser_full_smoke.py"
+permissions:
+  contents: read
+jobs:
+  browser-ko-en:
+    name: "Chromium MN-B44 Full ${{ matrix.lang }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [ko,en]
+    env:
+      MN_LANG: ${{ matrix.lang }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check live test pack size still B44
+        run: |
+          set -euo pipefail
+          test "$(stat -c %s myeongnyang-test/index.pck)" = 70699300
+          grep -Fq '"index.pck":70699300' myeongnyang-test/index.html
+      - name: Install Playwright Chromium and Pillow
+        run: |
+          python3 -m pip install --break-system-packages --quiet playwright pillow
+          python3 -m playwright install --with-deps chromium
+      - name: Real live Chromium open and click test
+        run: |
+          set -uo pipefail
+          python3 -u .github/scripts/mn_browser_full_smoke.py > browser.log 2>&1
+          code=$?
+          tail -90 browser.log
+          exit $code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: "MN-B44-live-browser-${{ matrix.lang }}"
+          path: |
+            browser-results/
+            browser.log
+          retention-days: 14
+          if-no-files-found: warn
