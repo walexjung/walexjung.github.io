@@ -64,16 +64,37 @@ try {
     if(frame.nonDarkRatio<0.005)throw new Error('Rendered canvas almost entirely black: '+tag);
     return frame;
   };
-  await analyze('launch');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(1400);
-  await analyze('after-escape');
-  // Mouse and keyboard events reach the live Godot canvas. Screenshots are artifacts,
-  // not evidence of completing any puzzles or hearing sound.
-  await canvas.click({position:{x:Math.floor(box.width*0.5),y:Math.floor(box.height*0.55)}});
-  await page.waitForTimeout(2000);
-  await analyze('after-mouse-click');
-  pass('Live WebGL rendering and actual mouse/keyboard input accepted',{frames:report.frames.length});
+  const bootFrame=await analyze('language-selection');
+  // Godot itself asks for language choice every launch, even when URL preselects it.
+  // Canvas is 1280x720 and the Godot base layout is 640x360 (2x viewport scaling).
+  await canvas.click({position:{x:lang==='en'?800:480,y:356}});
+  await page.waitForTimeout(2600);
+  const openingFrame=await analyze('opening-after-language');
+  if(JSON.stringify(openingFrame.avgRGB)===JSON.stringify(bootFrame.avgRGB) && openingFrame.nonDarkRatio===bootFrame.nonDarkRatio){
+    throw new Error('Language-choice click did not visibly change Godot scene');
+  }
+  pass('Language choice click advances to opening video');
+  // Opening controls include a clickable skip in Godot coordinates (532,10)+(98x26).
+  await canvas.click({position:{x:1130,y:45}});
+  await page.waitForTimeout(1900);
+  const titleFrame=await analyze('title-after-opening-skip');
+  if(JSON.stringify(titleFrame.avgRGB)===JSON.stringify(openingFrame.avgRGB) && titleFrame.nonDarkRatio===openingFrame.nonDarkRatio){
+    throw new Error('Opening skip click did not visibly change Godot scene');
+  }
+  pass('Opening skip click advances to title');
+  // Title VBox starts at 64,196 in Godot units; first button is New Game.
+  await canvas.click({position:{x:265,y:411}});
+  await page.waitForTimeout(3400);
+  const gameFrame=await analyze('new-game-1-1');
+  if(JSON.stringify(gameFrame.avgRGB)===JSON.stringify(titleFrame.avgRGB) && gameFrame.nonDarkRatio===titleFrame.nonDarkRatio){
+    throw new Error('New Game click did not visibly change Godot scene');
+  }
+  pass('Title New Game click enters chapter 1-1');
+  // A real click in active game and UI captures, not an assertion of all-puzzle completion.
+  await canvas.click({position:{x:650,y:535}});
+  await page.waitForTimeout(900);
+  await analyze('after-first-in-game-click');
+  pass('Live browser language → opening → title → 1-1 input navigation',{frames:report.frames.length});
   // HTTP failures, fatal page errors distinguish navigation from successful boot.
   const critical=report.consoleErrors.filter(x=>/Uncaught|out of memory|WebAssembly\.RuntimeError|SCRIPT ERROR|Failed loading file/i.test(x));
   if(critical.length)throw new Error('Fatal JS/game errors: '+critical.slice(0,5).join(' | '));
