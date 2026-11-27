@@ -550,5 +550,9 @@
  "노인에게 다시 '말하다'를 쓰고 '상여를 멜 사람들을…'을 고르시지요.": "Use 'Talk to' on the elder again and choose 'Can you find men to carry the bier?'",
  "회로 약재상에게 '말하다'를 쓰고 '장부를 제가 맞춰 드리지요'를 고른 뒤, 열다섯에서 아홉을 빼 보자.": "As Hoe, use 'Talk to' on the herbalist, choose 'Let me balance your ledger for you', then subtract nine from fifteen.",
  "노인에게 '말하다'를 쓰고 '상여를 멜 사람들을…'을 고르자.": "Use 'Talk to' on the elder and choose 'Can you find men to carry the bier?'",
- "노인에게 다시 '말하다'를 쓰고 '상여를 멜 사람들을…'을 고르자.": "Use 'Talk to' on the elder again and choose 'Can you find men to carry the bier?'"
+ "노인에게 다시 '말하다'를 쓰고 '상여를 멜 사람들을…'을 고르자.": "Use 'Talk to' on the elder again and choose 'Can you find men to carry the bier?'",
+ "어디로 갈까요?": "Choose a destination",
+ "열린 길만 표시됩니다. 목적지를 누르면 곧바로 이동합니다.": "Available routes are listed below. Select a destination to travel.",
+ "지금 갈 수 있는 다른 장소가 없습니다.": "No other destinations are available yet.",
+ "돌아가기 (Esc)": "Return (Esc)"
 }
